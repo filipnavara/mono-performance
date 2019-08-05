@@ -1,50 +1,64 @@
 trigger:
 - master
 
-pool:
-  vmImage: 'macOS-10.14'
+jobs:
+- job: Performance
+  timeoutInMinutes: 0
 
-variables:
-  lib_suffix: '.dylib'
-  platform_moniker: 'osx'
+  pool:
+    name: 'Mac'
+    # vmImage: 'macOS-10.14'
 
-steps:
-- script: |
-    mkdir work
-    git clone --depth 1 https://github.com/mono/mono.git work/mono
-    git clone --depth 1 https://github.com/dotnet/performance.git work/performance
-    cd work/performance
-    git remote add filipnavara https://github.com/filipnavara/performance.git
-    git fetch filipnavara
-    git cherry-pick e06f92c
-  displayName: 'Clone repositories'
-- script: |
-    # export DOTNET_SDK_VERSION=`cat work/performance/global.json | grep -m 1 "\"dotnet\"" | sed "s/.*\"dotnet\": \"\(.*\)\"/\\1/"`
-    # curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz --output work/sdk.tar.gz
-    curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/master/dotnet-sdk-latest-$(platform_moniker)-x64.tar.gz --output work/sdk.tar.gz
-    mkdir work/sdk
-    tar -xf work/sdk.tar.gz -C work/sdk
-    tar -xf work/sdk.tar.gz -C work/sdk-mono
-  displayName: 'Download .NET Core SDK'
-- script: |  
-    brew install autoconf automake libtool gnu-sed
-  displayName: 'Prepare OSX dependencies'
-- script: |
-    cd work/mono
-    ./autogen.sh --with-core=only
-    make -C netcore runtime bcl
-  displayName: 'Build Mono'
-- script: |
-    export DOTNET_VERSION=`ls work/sdk/shared/Microsoft.NETCore.App`
-    cp work/mono/mono/mini/.libs/libmonosgen-2.0$(lib_suffix) work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/libcoreclr$(lib_suffix)
-    cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.dll work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}
-    cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.pdb work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}    
-  displayName: 'Patch Mono .NET Core SDK'
-- script: |
-    cd work/performance/src/benchmarks/micro/
-    ../../../../sdk/dotnet run -f netcoreapp3.0 -c Release --cli ../../../../sdk/dotnet --anyCategories coreclr corefx --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true
-  displayName: 'Build and run microbenchmarks (CoreCLR)'
-- script: |
-    cd work/performance/src/benchmarks/micro/
-    ../../../../sdk-mono/dotnet run -f netcoreapp3.0 -c Release --cli ../../../../sdk-mono/dotnet --anyCategories coreclr corefx --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true
-  displayName: 'Build and run microbenchmarks (Mono)'
+  variables:
+    lib_suffix: '.dylib'
+    platform_moniker: 'osx'
+
+  steps:
+  - script: |
+      mkdir work
+      git clone --depth 1 https://github.com/mono/mono.git work/mono
+      cd work/mono; git submodule update --depth 1 --init -- external/llvm; cd ../..
+      git clone --depth 1 https://github.com/dotnet/performance.git work/performance
+      cd work/performance
+      git remote add filipnavara https://github.com/filipnavara/performance.git
+      git fetch filipnavara
+      git cherry-pick e06f92c
+    displayName: 'Clone repositories'
+  - script: |
+      # export DOTNET_SDK_VERSION=`cat work/performance/global.json | grep -m 1 "\"dotnet\"" | sed "s/.*\"dotnet\": \"\(.*\)\"/\\1/"`
+      # curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz --output work/sdk.tar.gz
+      curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/master/dotnet-sdk-latest-$(platform_moniker)-x64.tar.gz --output work/sdk.tar.gz
+      mkdir work/sdk
+      tar -xf work/sdk.tar.gz -C work/sdk
+      mkdir work/sdk-mono
+      tar -xf work/sdk.tar.gz -C work/sdk-mono
+    displayName: 'Download .NET Core SDK'
+  - script: |  
+      brew install autoconf automake libtool gnu-sed ninja cmake
+    displayName: 'Prepare OSX dependencies'
+  - script: |
+      cd work/mono
+      ./autogen.sh --with-core=only --enable-llvm --disable-dependency-tracking
+      make -C netcore runtime bcl
+    displayName: 'Build Mono'
+  - script: |
+      DOTNET_VERSION=`ls work/sdk/shared/Microsoft.NETCore.App`
+      cp work/mono/mono/mini/.libs/libmonosgen-2.0$(lib_suffix) work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/libcoreclr$(lib_suffix)
+      cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.dll work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}
+      cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.pdb work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}    
+    displayName: 'Patch Mono .NET Core SDK'
+  - script: |
+      cd work/performance/src/benchmarks/micro/
+      ../../../../sdk/dotnet run -f netcoreapp3.0 -c Release --cli ../../../../sdk/dotnet --anyCategories coreclr --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true
+    displayName: 'Build and run microbenchmarks (CoreCLR)'
+  - script: |
+      cd work/performance/src/benchmarks/micro/
+      ../../../../sdk-mono/dotnet run -f netcoreapp3.0 -c Release --cli ../../../../sdk-mono/dotnet --anyCategories coreclr --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true
+    displayName: 'Build and run microbenchmarks (Mono)'
+  - script: |
+      PATH=$PATH:`pwd`/mono/llvm/build/bin
+      DOTNET_VERSION=`ls work/sdk-mono/shared/Microsoft.NETCore.App`
+      cd work/performance/src/benchmarks/micro/
+      MONO_PATH=../../../../sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/:../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp3.0/ ../../../../mono/mono/mini/mono-sgen --aot=llvm,full --assembly-loader=strict ../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp3.0/MicroBenchmarks.dll 
+      MONO_PATH=../../../../sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/:../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp3.0/ ../../../../mono/mono/mini/mono-sgen --assembly-loader=strict ../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp3.0/MicroBenchmarks.dll --anyCategories coreclr --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true -i
+    displayName: 'Build and run microbenchmarks (Mono AOT)'
