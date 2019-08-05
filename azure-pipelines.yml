@@ -59,6 +59,6 @@ jobs:
       PATH=$PATH:`pwd`/mono/llvm/build/bin
       DOTNET_VERSION=`ls work/sdk-mono/shared/Microsoft.NETCore.App`
       cd work/performance/src/benchmarks/micro/
-      MONO_PATH=../../../../sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/:../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp3.0/ ../../../../mono/mono/mini/mono-sgen --aot=llvm,full --assembly-loader=strict ../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp3.0/MicroBenchmarks.dll 
+      MONO_PATH=../../../../sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/:../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp3.0/ ../../../../mono/mono/mini/mono-sgen --aot=llvm --assembly-loader=strict ../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp3.0/MicroBenchmarks.dll 
       MONO_PATH=../../../../sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/:../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp3.0/ ../../../../mono/mono/mini/mono-sgen --assembly-loader=strict ../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp3.0/MicroBenchmarks.dll --anyCategories coreclr --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true -i
     displayName: 'Build and run microbenchmarks (Mono AOT)'
