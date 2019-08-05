@@ -24,6 +24,7 @@ steps:
     curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/master/dotnet-sdk-latest-$(platform_moniker)-x64.tar.gz --output work/sdk.tar.gz
     mkdir work/sdk
     tar -xf work/sdk.tar.gz -C work/sdk
+    tar -xf work/sdk.tar.gz -C work/sdk-mono
   displayName: 'Download .NET Core SDK'
 - script: |  
     brew install autoconf automake libtool gnu-sed
@@ -35,12 +36,15 @@ steps:
   displayName: 'Build Mono'
 - script: |
     export DOTNET_VERSION=`ls work/sdk/shared/Microsoft.NETCore.App`
-    cp work/mono/mono/mini/.libs/libmonosgen-2.0$(lib_suffix) work/sdk/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/libcoreclr$(lib_suffix)
-    cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.dll work/sdk/shared/Microsoft.NETCore.App/${DOTNET_VERSION}
-    cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.pdb work/sdk/shared/Microsoft.NETCore.App/${DOTNET_VERSION}    
-  displayName: 'Patch .NET Core SDK'
-  # condition: 'false'
+    cp work/mono/mono/mini/.libs/libmonosgen-2.0$(lib_suffix) work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/libcoreclr$(lib_suffix)
+    cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.dll work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}
+    cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.pdb work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}    
+  displayName: 'Patch Mono .NET Core SDK'
 - script: |
     cd work/performance/src/benchmarks/micro/
-    ../../../../sdk/dotnet run -f netcoreapp3.0 -c Release --cli ../../../../sdk/dotnet --anyCategories "coreclr" --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true
-  displayName: 'Build and run microbenchmarks'
+    ../../../../sdk/dotnet run -f netcoreapp3.0 -c Release --cli ../../../../sdk/dotnet --anyCategories coreclr corefx --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true
+  displayName: 'Build and run microbenchmarks (CoreCLR)'
+- script: |
+    cd work/performance/src/benchmarks/micro/
+    ../../../../sdk-mono/dotnet run -f netcoreapp3.0 -c Release --cli ../../../../sdk-mono/dotnet --anyCategories coreclr corefx --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true
+  displayName: 'Build and run microbenchmarks (Mono)'
