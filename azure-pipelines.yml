@@ -12,12 +12,14 @@ jobs:
   variables:
     lib_suffix: '.dylib'
     platform_moniker: 'osx'
+    filter: '--anyCategories coreclr' # '--filter Burgers'
 
   steps:
   - script: |
       git clean -ffxd
       mkdir work
       git clone --depth 1 https://github.com/mono/mono.git work/mono
+      #git clone --depth 1 --single-branch --branch perf-test https://github.com/filipnavara/mono.git work/mono
       cd work/mono; git submodule update --depth 1 --init -- external/llvm; cd ../..
       git clone --depth 1 https://github.com/dotnet/performance.git work/performance
       cd work/performance
@@ -52,20 +54,27 @@ jobs:
     displayName: 'Patch Mono .NET Core SDK'
   - script: |
       cd work/performance/src/benchmarks/micro/
-      ../../../../sdk/dotnet run -f netcoreapp5.0 -c Release --cli ../../../../sdk/dotnet --anyCategories coreclr --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true
+      ../../../../sdk/dotnet run -f netcoreapp5.0 -c Release -i --artifacts ../../../../results-coreclr $(filter)
     displayName: 'Build and run microbenchmarks (CoreCLR)'
   - script: |
       cd work/performance/src/benchmarks/micro/
-      ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --cli ../../../../sdk-mono/dotnet --anyCategories coreclr --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true
-    displayName: 'Build and run microbenchmarks (Mono)'
+      MONO_ENV_OPTIONS="--llvm" ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --artifacts ../../../../results-mono-llvm -i $(filter)
+    displayName: 'Build and run microbenchmarks (Mono+LLVM)'
   - script: |
-      PATH=$PATH:`pwd`/work/mono/llvm/build/bin
-      DOTNET_VERSION=`ls work/sdk-mono/shared/Microsoft.NETCore.App`
       cd work/performance/src/benchmarks/micro/
-      ../../../../sdk-mono/dotnet publish -f netcoreapp5.0 -c Release -r osx-x64
-      cp ../../../../sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/System.Private.CoreLib.* ../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp5.0/osx-x64/
-      MONO_PATH=../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp5.0/osx-x64/ ../../../../mono/mono/mini/mono-sgen --aot=llvm --assembly-loader=strict ../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp5.0/osx-x64/System.Private.CoreLib.dll
-      MONO_PATH=../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp5.0/osx-x64/ ../../../../mono/mono/mini/mono-sgen --aot=llvm --assembly-loader=strict ../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp5.0/osx-x64/System.Numerics.Vectors.dll
-      MONO_PATH=../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp5.0/osx-x64/ ../../../../mono/mono/mini/mono-sgen --aot=llvm --assembly-loader=strict ../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp5.0/osx-x64/MicroBenchmarks.dll
-      MONO_LOG_LEVEL=debug MONO_LOG_MASK=aot MONO_PATH=../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp5.0/osx-x64/ ../../../../mono/mono/mini/mono-sgen --assembly-loader=strict ../../../artifacts/bin/MicroBenchmarks/Release/netcoreapp5.0/osx-x64/MicroBenchmarks.dll --anyCategories coreclr --iterationCount 1 --warmupCount 0 --invocationCount 1 --unrollFactor 1 --strategy ColdStart --stopOnFirstError true -i
-    displayName: 'Build and run microbenchmarks (Mono AOT)'
+      ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --artifacts ../../../../results-mono -i $(filter)
+    displayName: 'Build and run microbenchmarks (Mono)'
+    continueOnError: true
+  - script: |
+      cd work/performance/src/tools/ResultsComparer/
+      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-coreclr/ --diff ../../../../results-mono-llvm/ --threshold 5% --xml ../../../../diff-coreclr-mono-llvm.xml
+    displayName: 'Compare results (baseline: CoreCLR, diff: Mono+LLVM)'
+  - script: |
+      cd work/performance/src/tools/ResultsComparer/
+      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-coreclr/ --diff ../../../../results-mono/ --threshold 5% --xml ../../../../diff-coreclr-mono.xml
+    displayName: 'Compare results (baseline: CoreCLR, diff: Mono)'
+  - script: |
+      cd work/performance/src/tools/ResultsComparer/
+      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-mono/ --diff ../../../../results-mono-llvm/ --threshold 5% --xml ../../../../diff-mono-mono-llvm.xml
+    displayName: 'Compare results (baseline: Mono, diff: Mono+LLVM)'
+    
