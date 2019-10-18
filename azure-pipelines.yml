@@ -1,14 +1,6 @@
 trigger:
 - master
 
-schedules:
-- cron: "0 0 * * Mon,Wed,Fri"
-  displayName: 'Overnight build'
-  branches:
-    include:
-    - master
-  always: true
-
 jobs:
 - job: Performance
   timeoutInMinutes: 0
@@ -20,14 +12,14 @@ jobs:
   variables:
     lib_suffix: '.dylib'
     platform_moniker: 'osx'
-    filter: '--anyCategories coreclr' # '--filter Burgers'
-
+    filter: '--anyCategories coreclr'
+    pr: 17411
+  
   steps:
   - script: |
       git clean -ffxd
       mkdir work
       git clone --depth 1 https://github.com/mono/mono.git work/mono
-      #git clone --depth 1 --single-branch --branch perf-test https://github.com/filipnavara/mono.git work/mono
       cd work/mono; git submodule update --depth 1 --init -- external/llvm; cd ../..
       git clone --depth 1 https://github.com/dotnet/performance.git work/performance
       cd work/performance
@@ -36,13 +28,20 @@ jobs:
       git cherry-pick e06f92c
     displayName: 'Clone repositories'
   - script: |
+      git init work/mono-pr
+      cd work/mono-pr
+      git remote add origin https://github.com/mono/mono.git
+      git fetch --depth 1 origin refs/pull/$(pr)/merge:pr-merged
+      git checkout pr-merged
+      git submodule update --depth 1 --init -- external/llvm; cd ../..
+    displayName: 'Clone Mono PR'      
+  - script: |
       # export DOTNET_SDK_VERSION=`cat work/performance/global.json | grep -m 1 "\"dotnet\"" | sed "s/.*\"dotnet\": \"\(.*\)\"/\\1/"`
-      # curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz --output work/sdk.tar.gz
-      curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/master/dotnet-sdk-latest-$(platform_moniker)-x64.tar.gz --output work/sdk.tar.gz
+      export DOTNET_SDK_VERSION=5.0.100-alpha1-014074
+      curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-$(platform_moniker)-x64.tar.gz --output work/sdk.tar.gz
+      # curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/master/dotnet-sdk-latest-$(platform_moniker)-x64.tar.gz --output work/sdk.tar.gz
       mkdir work/sdk
       tar -xf work/sdk.tar.gz -C work/sdk
-      mkdir work/sdk-mono
-      tar -xf work/sdk.tar.gz -C work/sdk-mono
     displayName: 'Download .NET Core SDK'
   - script: |  
       brew update
@@ -55,43 +54,52 @@ jobs:
       make -C netcore runtime bcl
     displayName: 'Build Mono'
   - script: |
+      mkdir work/sdk-mono
+      tar -xf work/sdk.tar.gz -C work/sdk-mono
       DOTNET_VERSION=`ls work/sdk/shared/Microsoft.NETCore.App`
       cp work/mono/mono/mini/.libs/libmonosgen-2.0$(lib_suffix) work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/libcoreclr$(lib_suffix)
       cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.dll work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}
       cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.pdb work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}    
     displayName: 'Patch Mono .NET Core SDK'
   - script: |
+      cd work/mono-pr
+      ./autogen.sh --with-core=only --enable-llvm --disable-dependency-tracking
+      make -C netcore runtime bcl
+    displayName: 'Build Mono+PR'
+  - script: |
+      mkdir work/sdk-mono-pr
+      tar -xf work/sdk.tar.gz -C work/sdk-mono-pr
+      DOTNET_VERSION=`ls work/sdk/shared/Microsoft.NETCore.App`
+      cp work/mono-pr/mono/mini/.libs/libmonosgen-2.0$(lib_suffix) work/sdk-mono-pr/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/libcoreclr$(lib_suffix)
+      cp work/mono-pr/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.dll work/sdk-mono-pr/shared/Microsoft.NETCore.App/${DOTNET_VERSION}
+      cp work/mono-pr/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.pdb work/sdk-mono-pr/shared/Microsoft.NETCore.App/${DOTNET_VERSION}    
+    displayName: 'Patch Mono+PR .NET Core SDK'
+  - script: |
       cd work/performance/src/benchmarks/micro/
       ../../../../sdk/dotnet run -f netcoreapp5.0 -c Release -i --artifacts ../../../../results-coreclr $(filter)
     displayName: 'Build and run microbenchmarks (CoreCLR)'
-  - publish: work/results-coreclr
-    artifact: 'CoreCLR results'
-    displayName: 'Publish CoreCLR results'
+    condition: false
   - script: |
       cd work/performance/src/benchmarks/micro/
       MONO_ENV_OPTIONS="--llvm" ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --artifacts ../../../../results-mono-llvm -i $(filter)
     displayName: 'Build and run microbenchmarks (Mono+LLVM)'
-  - publish: work/results-mono-llvm
-    artifact: 'Mono+LLVM results'
-    displayName: 'Publish Mono+LLVM results'
   - script: |
       cd work/performance/src/benchmarks/micro/
-      ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --artifacts ../../../../results-mono -i $(filter)
-    displayName: 'Build and run microbenchmarks (Mono)'
-    continueOnError: true
-  - publish: work/results-mono
-    artifact: 'Mono results'
-    displayName: 'Publish Mono results'
+      MONO_ENV_OPTIONS="--llvm" ../../../../sdk-mono-pr/dotnet run -f netcoreapp5.0 -c Release --artifacts ../../../../results-mono-llvm-pr -i $(filter)
+    displayName: 'Build and run microbenchmarks (Mono+PR+LLVM)'
   - script: |
       cd work/performance/src/tools/ResultsComparer/
-      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-coreclr/ --diff ../../../../results-mono-llvm/ --threshold 5% --xml ../../../../diff-coreclr-mono-llvm.xml
-    displayName: 'Compare results (baseline: CoreCLR, diff: Mono+LLVM)'
+      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-coreclr/ --diff ../../../../results-mono-llvm/ --threshold 0% --xml ../../../../diff-coreclr-mono-llvm.xml
+    displayName: 'Compare results'
+    condition: false
   - script: |
       cd work/performance/src/tools/ResultsComparer/
-      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-coreclr/ --diff ../../../../results-mono/ --threshold 5% --xml ../../../../diff-coreclr-mono.xml
-    displayName: 'Compare results (baseline: CoreCLR, diff: Mono)'
-  - script: |
-      cd work/performance/src/tools/ResultsComparer/
-      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-mono/ --diff ../../../../results-mono-llvm/ --threshold 5% --xml ../../../../diff-mono-mono-llvm.xml
-    displayName: 'Compare results (baseline: Mono, diff: Mono+LLVM)'
+      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-mono-llvm/ --diff ../../../../results-mono-llvm-pr/ --threshold 0% --xml ../../../../diff-mono-llvm-pr.xml
+    displayName: 'Compare results'
+  - task: PublishTestResults@2
+    inputs:
+      testRunTitle: 'CoreCLR vs Mono-LLVM'
+      testResultsFormat: 'XUnit'
+      testResultsFiles: 'work/diff-coreclr-mono-llvm.xml'
+    condition: 'false' #succeededOrFailed()
     
