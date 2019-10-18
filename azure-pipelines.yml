@@ -64,15 +64,24 @@ jobs:
       cd work/performance/src/benchmarks/micro/
       ../../../../sdk/dotnet run -f netcoreapp5.0 -c Release -i --artifacts ../../../../results-coreclr $(filter)
     displayName: 'Build and run microbenchmarks (CoreCLR)'
+  - publish: work/results-coreclr
+    artifact: 'CoreCLR results'
+    displayName: 'Publish CoreCLR results'
   - script: |
       cd work/performance/src/benchmarks/micro/
       MONO_ENV_OPTIONS="--llvm" ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --artifacts ../../../../results-mono-llvm -i $(filter)
     displayName: 'Build and run microbenchmarks (Mono+LLVM)'
+  - publish: work/results-mono-llvm
+    artifact: 'Mono+LLVM results'
+    displayName: 'Publish Mono+LLVM results'
   - script: |
       cd work/performance/src/benchmarks/micro/
       ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --artifacts ../../../../results-mono -i $(filter)
     displayName: 'Build and run microbenchmarks (Mono)'
     continueOnError: true
+  - publish: work/results-mono
+    artifact: 'Mono results'
+    displayName: 'Publish Mono results'
   - script: |
       cd work/performance/src/tools/ResultsComparer/
       PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-coreclr/ --diff ../../../../results-mono-llvm/ --threshold 5% --xml ../../../../diff-coreclr-mono-llvm.xml
