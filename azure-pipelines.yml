@@ -28,7 +28,7 @@ jobs:
       mkdir work
       git clone --depth 1 https://github.com/mono/mono.git work/mono
       #git clone --depth 1 --single-branch --branch perf-test https://github.com/filipnavara/mono.git work/mono
-      cd work/mono; git submodule update --depth 1 --init -- external/llvm; cd ../..
+      cd work/mono; git submodule update --depth 1 --init -- external/llvm-project; cd ../..
       git clone --depth 1 https://github.com/dotnet/performance.git work/performance
       cd work/performance
       git remote add filipnavara https://github.com/filipnavara/performance.git
