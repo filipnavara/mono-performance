@@ -2,7 +2,7 @@ trigger:
 - master
 
 schedules:
-- cron: "0 0 * * Mon,Wed,Fri"
+- cron: "0 0 * * *"
   displayName: 'Overnight build'
   branches:
     include:
