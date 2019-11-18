@@ -12,17 +12,39 @@ schedules:
 jobs:
 - job: Performance
   timeoutInMinutes: 0
+  
+  strategy:
+    matrix:
+      macOS x64:
+        poolname: 'Mac'
+        lib_suffix: '.dylib'
+        os: 'osx'
+        architecture: 'x64'
+        include_coreclr: true
+        include_monollvmjit: true
+        include_monojit: true
+      Linux arm64:
+        poolname: 'AWS'
+        lib_suffix: '.so'
+        os: 'linux'
+        architecture: 'arm64'
+        include_coreclr: true
+        include_monollvmjit: true
+        include_monojit: false
 
   pool:
-    name: 'Mac'
-    # vmImage: 'macOS-10.14'
+    name: $(poolname)
 
   variables:
-    lib_suffix: '.dylib'
-    platform_moniker: 'osx'
-    filter: '--anyCategories coreclr' # '--filter Burgers'
+    filter: '--anyCategories coreclr' #'--filter Burgers'
 
   steps:
+  - script: |  
+      brew update
+      brew install autoconf automake libtool gnu-sed ninja cmake || true
+      brew upgrade autoconf automake libtool gnu-sed ninja cmake || true
+    condition: and(succeeded(), eq(variables['os'], 'osx'))
+    displayName: 'Prepare OSX dependencies'
   - script: |
       git clean -ffxd
       mkdir work
@@ -34,64 +56,86 @@ jobs:
       git remote add filipnavara https://github.com/filipnavara/performance.git
       git fetch filipnavara
       git cherry-pick e06f92c
+      git cherry-pick d1768c7f
     displayName: 'Clone repositories'
   - script: |
-      # export DOTNET_SDK_VERSION=`cat work/performance/global.json | grep -m 1 "\"dotnet\"" | sed "s/.*\"dotnet\": \"\(.*\)\"/\\1/"`
-      # curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/${DOTNET_SDK_VERSION}/dotnet-sdk-${DOTNET_SDK_VERSION}-linux-x64.tar.gz --output work/sdk.tar.gz
-      curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/master/dotnet-sdk-latest-$(platform_moniker)-x64.tar.gz --output work/sdk.tar.gz
+      wget -q https://dotnetcli.blob.core.windows.net/dotnet/Sdk/master/dotnet-sdk-latest-$(os)-$(architecture).tar.gz -O work/sdk.tar.gz
+    condition: and(succeeded(), eq(variables['os'], 'linux'))
+    displayName: 'Download .NET Core SDK (wget)'
+  - script: |
+      curl https://dotnetcli.blob.core.windows.net/dotnet/Sdk/master/dotnet-sdk-latest-$(os)-$(architecture).tar.gz --output work/sdk.tar.gz
+    condition: and(succeeded(), ne(variables['os'], 'linux'))
+    displayName: 'Download .NET Core SDK (curl)'
+  - script: |
       mkdir work/sdk
       tar -xf work/sdk.tar.gz -C work/sdk
       mkdir work/sdk-mono
       tar -xf work/sdk.tar.gz -C work/sdk-mono
-    displayName: 'Download .NET Core SDK'
-  - script: |  
-      brew update
-      brew install autoconf automake libtool gnu-sed ninja cmake || true
-      brew upgrade autoconf automake libtool gnu-sed ninja cmake || true
-    displayName: 'Prepare OSX dependencies'
+    displayName: 'Unpack .NET Core SDK'
   - script: |
       cd work/mono
-      ./autogen.sh --with-core=only --enable-llvm --disable-dependency-tracking
+      LLVM_HASH=`git -C external/llvm-project rev-parse HEAD`
+      rsync -aq ~/llvm/${LLVM_HASH}/usr/ llvm/usr/
+      rsync -aq ~/llvm/${LLVM_HASH}/build/ llvm/build/
+      rsync -aq ~/llvm/${LLVM_HASH}/llvm_config.mk llvm/llvm_config.mk
+    continueOnError: true
+    condition: and(succeeded(), eq(variables['os'], 'linux'))
+    displayName: 'Restore cached LLVM build'
+  - script: |
+      cd work/mono
+      cp llvm/llvm_config.mk llvm/llvm_config.mk.bak
+      ./autogen.sh --with-core=only --enable-llvm --disable-dependency-tracking --disable-btls
+      cp llvm/llvm_config.mk.bak llvm/llvm_config.mk
       make -C netcore runtime bcl
     displayName: 'Build Mono'
   - script: |
       DOTNET_VERSION=`ls work/sdk/shared/Microsoft.NETCore.App`
       cp work/mono/mono/mini/.libs/libmonosgen-2.0$(lib_suffix) work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}/libcoreclr$(lib_suffix)
-      cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.dll work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}
-      cp work/mono/netcore/System.Private.CoreLib/bin/x64/System.Private.CoreLib.pdb work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}    
+      cp work/mono/netcore/System.Private.CoreLib/bin/$(architecture)/System.Private.CoreLib.dll work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}
+      cp work/mono/netcore/System.Private.CoreLib/bin/$(architecture)/System.Private.CoreLib.pdb work/sdk-mono/shared/Microsoft.NETCore.App/${DOTNET_VERSION}
     displayName: 'Patch Mono .NET Core SDK'
   - script: |
       cd work/performance/src/benchmarks/micro/
-      ../../../../sdk/dotnet run -f netcoreapp5.0 -c Release -i --artifacts ../../../../results-coreclr $(filter)
+      ../../../../sdk/dotnet run -f netcoreapp5.0 -c Release --cli ../../../../sdk/dotnet --artifacts ../../../../results-coreclr $(filter)
+    condition: and(succeeded(), eq(variables['include_coreclr'], true))
     displayName: 'Build and run microbenchmarks (CoreCLR)'
   - publish: work/results-coreclr
-    artifact: 'CoreCLR results'
+    artifact: $(os)_$(architecture)_coreclr
+    condition: and(succeeded(), eq(variables['include_coreclr'], true))
     displayName: 'Publish CoreCLR results'
   - script: |
       cd work/performance/src/benchmarks/micro/
-      MONO_ENV_OPTIONS="--llvm" ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --artifacts ../../../../results-mono-llvm -i $(filter)
+      MONO_BDN_ENV_OPTIONS="--llvm" ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --cli ../../../../sdk-mono/dotnet --artifacts ../../../../results-mono-llvm $(filter)
+    condition: and(succeeded(), eq(variables['include_monollvmjit'], true))
     displayName: 'Build and run microbenchmarks (Mono+LLVM)'
   - publish: work/results-mono-llvm
-    artifact: 'Mono+LLVM results'
+    artifact: $(os)_$(architecture)_monollvmjit
+    condition: and(succeeded(), eq(variables['include_monollvmjit'], true))
     displayName: 'Publish Mono+LLVM results'
   - script: |
       cd work/performance/src/benchmarks/micro/
-      ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --artifacts ../../../../results-mono -i $(filter)
-    displayName: 'Build and run microbenchmarks (Mono)'
+      ../../../../sdk-mono/dotnet run -f netcoreapp5.0 -c Release --cli ../../../../sdk-mono/dotnet --artifacts ../../../../results-mono $(filter)
+    condition: and(succeeded(), eq(variables['include_monojit'], true))
     continueOnError: true
+    displayName: 'Build and run microbenchmarks (Mono)'
   - publish: work/results-mono
-    artifact: 'Mono results'
+    artifact: $(os)_$(architecture)_monojit
+    condition: and(succeeded(), eq(variables['include_monojit'], true))
+    continueOnError: true
     displayName: 'Publish Mono results'
   - script: |
       cd work/performance/src/tools/ResultsComparer/
       PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-coreclr/ --diff ../../../../results-mono-llvm/ --threshold 5% --xml ../../../../diff-coreclr-mono-llvm.xml
+    condition: and(succeeded(), eq(variables['include_coreclr'], true), eq(variables['include_monollvmjit'], true))
     displayName: 'Compare results (baseline: CoreCLR, diff: Mono+LLVM)'
   - script: |
       cd work/performance/src/tools/ResultsComparer/
       PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-coreclr/ --diff ../../../../results-mono/ --threshold 5% --xml ../../../../diff-coreclr-mono.xml
+    condition: and(succeeded(), eq(variables['include_coreclr'], true), eq(variables['include_monojit'], true))
     displayName: 'Compare results (baseline: CoreCLR, diff: Mono)'
   - script: |
       cd work/performance/src/tools/ResultsComparer/
       PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 ../../../../sdk/dotnet run -f netcoreapp5.0 --base ../../../../results-mono/ --diff ../../../../results-mono-llvm/ --threshold 5% --xml ../../../../diff-mono-mono-llvm.xml
+    condition: and(succeeded(), eq(variables['include_monojit'], true), eq(variables['include_monollvmjit'], true))
     displayName: 'Compare results (baseline: Mono, diff: Mono+LLVM)'
     
