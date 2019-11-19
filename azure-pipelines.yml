@@ -84,7 +84,7 @@ jobs:
   - script: |
       cd work/mono
       cp llvm/llvm_config.mk llvm/llvm_config.mk.bak
-      ./autogen.sh --with-core=only --enable-llvm --disable-dependency-tracking --disable-btls
+      CFLAGS="-O2 -g" CXXFLAGS="-O2 -g" ./autogen.sh --with-core=only --enable-llvm --disable-dependency-tracking --disable-btls
       cp llvm/llvm_config.mk.bak llvm/llvm_config.mk
       make -C netcore runtime bcl
     displayName: 'Build Mono'
