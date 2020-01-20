@@ -55,7 +55,7 @@ jobs:
       cd work/performance
       git remote add filipnavara https://github.com/filipnavara/performance.git
       git fetch filipnavara
-      git cherry-pick e06f92c
+      git cherry-pick 7147e39
       git cherry-pick d1768c7f
     displayName: 'Clone repositories'
   - script: |
