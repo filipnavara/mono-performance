@@ -36,7 +36,7 @@ jobs:
     name: $(poolname)
 
   variables:
-    filter: '--anyCategories coreclr' #'--filter Burgers'
+    filter: '--anyCategories runtime' #'--filter Burgers'
 
   steps:
   - script: |  
