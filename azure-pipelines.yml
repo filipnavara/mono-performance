@@ -85,15 +85,15 @@ jobs:
     continueOnError: true
     displayName: 'Publish Mono results'
   - script: |
-      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 work/coreclr-testhost/dotnet run --project work/performance/src/tools/ResultsComparer/ -f netcoreapp5.0 --base work/results-coreclr/ --diff work/results-mono-llvm/ --threshold 5% --xml work/diff-coreclr-mono-llvm.xml
+      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 work/runtime/.dotnet/dotnet run --project work/performance/src/tools/ResultsComparer/ -f netcoreapp5.0 --base work/results-coreclr/ --diff work/results-mono-llvm/ --threshold 5% --xml work/diff-coreclr-mono-llvm.xml
     condition: and(succeeded(), eq(variables['include_coreclr'], true), eq(variables['include_monollvmjit'], true))
     displayName: 'Compare results (baseline: CoreCLR, diff: Mono+LLVM)'
   - script: |
-      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 work/coreclr-testhost/dotnet run --project work/performance/src/tools/ResultsComparer/ -f netcoreapp5.0 --base work/results-coreclr/ --diff work/results-mono/ --threshold 5% --xml work/diff-coreclr-mono.xml
+      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 work/runtime/.dotnet/dotnet run --project work/performance/src/tools/ResultsComparer/ -f netcoreapp5.0 --base work/results-coreclr/ --diff work/results-mono/ --threshold 5% --xml work/diff-coreclr-mono.xml
     condition: and(succeeded(), eq(variables['include_coreclr'], true), eq(variables['include_monojit'], true))
     displayName: 'Compare results (baseline: CoreCLR, diff: Mono)'
   - script: |
-      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 work/coreclr-testhost/dotnet run --project work/performance/src/tools/ResultsComparer/ -f netcoreapp5.0 --base work/results-mono/ --diff work/results-mono-llvm/ --threshold 5% --xml work/diff-mono-mono-llvm.xml
+      PERFLAB_TARGET_FRAMEWORKS=netcoreapp5.0 work/runtime/.dotnet/dotnet run --project work/performance/src/tools/ResultsComparer/ -f netcoreapp5.0 --base work/results-mono/ --diff work/results-mono-llvm/ --threshold 5% --xml work/diff-mono-mono-llvm.xml
     condition: and(succeeded(), eq(variables['include_monojit'], true), eq(variables['include_monollvmjit'], true))
     displayName: 'Compare results (baseline: Mono, diff: Mono+LLVM)'
     
