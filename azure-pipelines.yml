@@ -37,21 +37,6 @@ jobs:
     filter: '--filter Burgers' # '--anyCategories runtime'
 
   steps:
-  - script: |  
-      brew update
-      brew install cmake autoconf automake libtool pkg-config python3 icu4c gnu-sed ninja || true
-      brew install cmake autoconf automake libtool pkg-config python3 icu4c gnu-sed ninja || true
-      brew link --force icu4c || true
-      brew install openssl
-      brew link pkg-config
-      mkdir -p /usr/local/lib/pkgconfig
-      ln -s /usr/local/opt/openssl\@1.1/lib/libcrypto.1.1.dylib /usr/local/lib/
-      ln -s /usr/local/opt/openssl\@1.1/lib/libssl.1.1.dylib /usr/local/lib/
-      ln -s /usr/local/opt/openssl\@1.1/lib/pkgconfig/libcrypto.pc /usr/local/lib/pkgconfig/
-      ln -s /usr/local/opt/openssl\@1.1/lib/pkgconfig/libssl.pc /usr/local/lib/pkgconfig/
-      ln -s /usr/local/opt/openssl\@1.1/lib/pkgconfig/openssl.pc /usr/local/lib/pkgconfig/
-    condition: and(succeeded(), eq(variables['os'], 'osx'))
-    displayName: 'Prepare OSX dependencies'
   - script: |
       git clean -ffxd
       mkdir work
