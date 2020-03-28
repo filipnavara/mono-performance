@@ -34,7 +34,7 @@ jobs:
     name: $(poolname)
 
   variables:
-    filter: '--anyCategories runtime' #'--filter Burgers'
+    filter: '--filter Burgers' # '--anyCategories runtime'
 
   steps:
   - script: |  
@@ -54,7 +54,7 @@ jobs:
       git cherry-pick d1768c7f
     displayName: 'Clone repositories'
   - script: |
-      cd work/runtume
+      cd work/runtime
       ./build.sh -c Release /p:MonoEnableLlvm=true
     displayName: 'Build CoreCLR, Mono and Libraries'
   - script: |
