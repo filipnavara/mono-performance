@@ -59,8 +59,7 @@ jobs:
       cp -r work/runtime/artifacts/bin/mono/${RUNTIME_CONFIGURATION}/* work/mono-testhost/shared/Microsoft.NETCore.App/5.0.0/
     displayName: 'Prepare test hosts'
   - script: |
-      TESTHOST_NAME=`ls work/runtime/artifacts/bin/testhost/`
-      work/runtime/.dotnet/dotnet run --project work/performance/src/benchmarks/micro/ -f netcoreapp5.0 -c Release --cli work/runtime/.dotnet/dotnet --coreRun work/coreclr-testhost/${TESTHOST_NAME}/shared/Microsoft.NETCore.App/5.0.0/corerun --artifacts work/results-coreclr $(filter)
+      work/runtime/.dotnet/dotnet run --project work/performance/src/benchmarks/micro/ -f netcoreapp5.0 -c Release --cli work/runtime/.dotnet/dotnet --coreRun work/coreclr-testhost/shared/Microsoft.NETCore.App/5.0.0/corerun --artifacts work/results-coreclr $(filter)
     condition: and(succeeded(), eq(variables['include_coreclr'], true))
     displayName: 'Build and run microbenchmarks (CoreCLR)'
   - publish: work/results-coreclr
@@ -68,8 +67,7 @@ jobs:
     condition: and(succeeded(), eq(variables['include_coreclr'], true))
     displayName: 'Publish CoreCLR results'
   - script: |
-      TESTHOST_NAME=`ls work/runtime/artifacts/bin/testhost/`
-      MONO_BDN_ENV_OPTIONS="--llvm" work/runtime/.dotnet/dotnet run --project work/performance/src/benchmarks/micro/ -f netcoreapp5.0 -c Release  --cli work/runtime/.dotnet/dotnet --coreRun work/mono-testhost/${TESTHOST_NAME}/shared/Microsoft.NETCore.App/5.0.0/corerun --artifacts work/results-mono-llvm $(filter)
+      MONO_BDN_ENV_OPTIONS="--llvm" work/runtime/.dotnet/dotnet run --project work/performance/src/benchmarks/micro/ -f netcoreapp5.0 -c Release --cli work/runtime/.dotnet/dotnet --coreRun work/mono-testhost/shared/Microsoft.NETCore.App/5.0.0/corerun --artifacts work/results-mono-llvm $(filter)
     condition: and(succeeded(), eq(variables['include_monollvmjit'], true))
     displayName: 'Build and run microbenchmarks (Mono+LLVM)'
   - publish: work/results-mono-llvm
@@ -77,8 +75,7 @@ jobs:
     condition: and(succeeded(), eq(variables['include_monollvmjit'], true))
     displayName: 'Publish Mono+LLVM results'
   - script: |
-      TESTHOST_NAME=`ls work/runtime/artifacts/bin/testhost/`
-      work/runtime/.dotnet/dotnet run --project work/performance/src/benchmarks/micro/ -f netcoreapp5.0 -c Release  --cli work/runtime/.dotnet/dotnet --coreRun work/mono-testhost/${TESTHOST_NAME}/shared/Microsoft.NETCore.App/5.0.0/corerun --artifacts work/results-mono $(filter)
+      work/runtime/.dotnet/dotnet run --project work/performance/src/benchmarks/micro/ -f netcoreapp5.0 -c Release --cli work/runtime/.dotnet/dotnet --coreRun work/mono-testhost/shared/Microsoft.NETCore.App/5.0.0/corerun --artifacts work/results-mono $(filter)
     condition: and(succeeded(), eq(variables['include_monojit'], true))
     continueOnError: true
     displayName: 'Build and run microbenchmarks (Mono)'
