@@ -56,7 +56,7 @@ jobs:
       RUNTIME_CONFIGURATION=`ls work/runtime/artifacts/bin/mono/`
       cp -r work/runtime/artifacts/bin/testhost/${TESTHOST_NAME}/ work/coreclr-testhost/
       cp -r work/runtime/artifacts/bin/testhost/${TESTHOST_NAME}/ work/mono-testhost/
-      cp work/runtime/artifacts/bin/mono/${RUNTIME_CONFIGURATION}/* work/mono-testhost/shared/Microsoft.NETCore.App/5.0.0/
+      cp -r work/runtime/artifacts/bin/mono/${RUNTIME_CONFIGURATION}/* work/mono-testhost/shared/Microsoft.NETCore.App/5.0.0/
     displayName: 'Prepare test hosts'
   - script: |
       work/coreclr-testhost/dotnet run --project work/performance/src/benchmarks/micro/ -f netcoreapp5.0 -c Release --cli work/coreclr-testhost/dotnet --artifacts work/results-coreclr $(filter)
