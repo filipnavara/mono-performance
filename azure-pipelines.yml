@@ -34,7 +34,7 @@ jobs:
     name: $(poolname)
 
   variables:
-    filter: '--filter Burgers' # '--anyCategories runtime'
+    filter: '--anyCategories runtime' # '--filter Burgers'
 
   steps:
   - script: |
