@@ -14,4 +14,4 @@ The following configurations are currently tested:
 
 They are tested on those machine pools:
 - macOS x64 (macOS 10.15, Mac Mini 2018, Core i5-8500B, 32 GB RAM, disabled Turbo Boost)
-- Linux arm64 (Ubuntu 18.04, AWS m6g.large instance, AWS Graviton 2, 4 GB RAM)
+- Linux arm64 (Ubuntu 18.04, AWS m6g.large instance, AWS Graviton 2, 8 GB RAM)
