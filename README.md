@@ -1,5 +1,7 @@
 # CoreCLR Microbenchmarks
 
+**Due to robbery where the build machine was stolen this project is cancelled for the time being.**
+
 [![Build Status](https://filipnavara.visualstudio.com/mono-performance/_apis/build/status/filipnavara.mono-performance?branchName=master)](https://filipnavara.visualstudio.com/mono-performance/_build/latest?definitionId=4&branchName=master)
 
 This repository holds scripts for daily runs of the [.NET Core microbenchmarks](https://github.com/dotnet/performance)
